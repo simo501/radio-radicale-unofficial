@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f3f3f3">
+  <title>Archivio · Radio Radicale</title>
+  <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css">
+  <link rel="stylesheet" href="/ui/styles.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>
+  <script defer src="https://cdn.plyr.io/3.7.8/plyr.js"></script>
+  <script defer src="/ui/speaker-timeline.js"></script>
+  <script defer src="/ui/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Vai al contenuto</a>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Radio Radicale, pagina iniziale">radio radicale</a>
+    <span class="brand-context">/ archivio pubblico</span>
+    <a class="docs-link" href="/docs">[api]</a>
+  </header>
+
+  <div class="mobile-tabs" role="tablist" aria-label="Sezioni">
+    <button id="tab-search" class="mobile-tab active" role="tab" aria-selected="true" aria-controls="search-panel">cerca nell’archivio</button>
+    <button id="tab-player" class="mobile-tab" role="tab" aria-selected="false" aria-controls="player-panel">lettore</button>
+  </div>
+
+  <main id="main-content" class="layout">
+    <section id="search-panel" class="search-panel" aria-labelledby="search-heading">
+      <div class="search-header">
+        <p class="eyebrow">voci, persone, storia</p>
+        <h1 id="search-heading">cerca nell’archivio</h1>
+        <p class="intro">Registrazioni, dibattiti e udienze di Radio Radicale.</p>
+      </div>
+      <form id="search-form" class="search-form" role="search">
+        <label for="search-input">Parole, persone o eventi</label>
+        <div class="search-control">
+          <input id="search-input" name="q" type="search" placeholder="es. giustizia, Marco Pannella…" autocomplete="off" required>
+          <button type="submit">cerca</button>
+        </div>
+      </form>
+      <div class="search-tools">
+        <h2 id="result-heading" class="result-heading" aria-live="polite">risultati</h2>
+        <button id="live-button" class="live-button" type="button"><span class="live-dot" aria-hidden="true"></span>ascolta la diretta</button>
+      </div>
+      <p id="search-status" class="status" role="status" aria-live="polite"></p>
+      <div id="results" class="results"></div>
+      <nav id="pagination" class="pagination" aria-label="Pagine dei risultati" hidden>
+        <div class="page-bar"><button id="prev-page" type="button">← precedenti</button><span id="page-label" aria-live="polite"></span><button id="next-page" type="button">successivi →</button></div>
+        <form id="page-form" class="page-form"><label for="page-number">vai alla pagina</label><input id="page-number" type="number" inputmode="numeric" min="1" step="1" required><button type="submit">vai</button></form>
+      </nav>
+      <section id="related-section" class="related" hidden><h2>esplora per soggetto</h2><div id="related-links"></div></section>
+    </section>
+
+    <section id="player-panel" class="player-panel" aria-labelledby="player-heading">
+      <div class="player-sticky">
+        <div class="panel-header"><h2 id="player-heading">lettore</h2><span id="player-kind" class="panel-tag">archivio</span></div>
+        <div id="empty-player" class="empty-player">
+          <h3>scegli una registrazione</h3>
+          <p>Tocca un titolo nei risultati per ascoltarlo.</p>
+          <p>Hai già una scheda? Puoi aprirla con il numero o il link qui sotto.</p>
+        </div>
+        <div id="loaded-player" hidden>
+          <div class="player-copy"><p id="recording-date" class="recording-date"></p><h3 id="recording-title"></h3><p id="recording-meta" class="recording-meta"></p></div>
+          <div class="media-shell"><div id="poster" class="poster" aria-hidden="true"><span>radio radicale</span></div><video id="media-video" controls playsinline preload="none" aria-label="Lettore video"></video><audio id="media-audio" controls preload="none" aria-label="Lettore audio" hidden></audio></div>
+          <div id="timeline-tools" class="timeline-tools" hidden>
+            <div class="seek-readout"><span id="seek-preview" class="seek-preview"></span><span id="seek-remaining" class="seek-remaining"></span></div>
+            <div id="timeline-chapters" class="timeline-chapters" role="group" aria-label="Punti degli interventi nella traccia" hidden></div>
+            <form id="seek-form" class="seek-form" novalidate aria-label="Vai a un punto preciso della traccia">
+              <span>vai a</span>
+              <label><input id="seek-minutes" type="number" inputmode="numeric" min="0" step="1" placeholder="0" aria-label="Minuti da inizio traccia" aria-describedby="seek-error" disabled> min</label>
+              <label><input id="seek-seconds" type="number" inputmode="numeric" min="0" max="59" step="1" placeholder="0" aria-label="Secondi" aria-describedby="seek-error" disabled> sec</label>
+              <button id="seek-submit" type="submit" disabled>vai</button>
+            </form>
+            <p id="seek-error" class="status error" role="status" hidden></p>
+          </div>
+          <div id="playback-tools" class="playback-tools" role="group" aria-label="Comandi di ascolto" hidden>
+            <button id="skip-back" type="button" aria-label="Indietro di 15 secondi">−15 s</button>
+            <button id="skip-forward" type="button" aria-label="Avanti di 15 secondi">+15 s</button>
+            <label for="playback-speed">Velocità <select id="playback-speed"><option value="0.75">0,75×</option><option value="1" selected>1×</option><option value="1.25">1,25×</option><option value="1.5">1,5×</option><option value="2">2×</option></select></label>
+          </div>
+          <div id="track-container" class="track-container" hidden><label for="track-select">Traccia</label><select id="track-select"></select></div>
+          <div id="speaker-now" class="speaker-now" aria-live="polite" hidden><span id="speaker-now-label">INTERVENTO IN CORSO</span><strong id="speaker-now-name"></strong><small id="speaker-now-meta"></small></div>
+          <div class="player-actions"><button id="copy-media" type="button" hidden>copia link media</button><a id="media-link" href="#" target="_blank" rel="noopener noreferrer" hidden>apri media ↗</a><a id="source-link" href="#" target="_blank" rel="noopener noreferrer" hidden>scheda originale ↗</a><a id="json-link" href="#" target="_blank" rel="noopener noreferrer" hidden>json ↗</a></div>
+        </div>
+      </div>
+      <p id="player-status" class="status" role="status" aria-live="polite"></p>
+      <div id="detail-content" class="detail-content" hidden>
+        <p id="detail-summary" class="detail-summary" hidden></p>
+        <div id="topics" class="topics" hidden></div>
+        <section id="speakers-section" class="speakers-section" hidden>
+          <div class="section-heading"><h3>oratori e interventi</h3><span id="speaker-count"></span></div>
+          <label class="filter-label" for="speaker-filter">Filtra per nome, ruolo o traccia</label>
+          <input id="speaker-filter" class="speaker-filter" type="search" placeholder="es. avvocato, Audio 2…" autocomplete="off">
+          <p class="section-hint">Tocca un intervento per ascoltarlo, anche in un’altra traccia.</p>
+          <div id="speakers"></div>
+          <p id="speaker-filter-empty" class="status" hidden>Nessun intervento corrisponde al filtro.</p>
+        </section>
+      </div>
+      <form id="open-form" class="open-form"><label for="open-input">apri una scheda</label><div><input id="open-input" placeholder="Numero o URL della registrazione" inputmode="url" required><button type="submit">apri</button></div></form>
+    </section>
+  </main>
+
+  <div id="mini-player" class="mini-player" hidden>
+    <button id="mini-open" class="mini-open" type="button" aria-label="Apri il lettore"><span class="mini-copy"><strong id="mini-title"></strong><small id="mini-state">Tocca per aprire</small></span><span aria-hidden="true">↑</span></button>
+    <button id="mini-toggle" class="mini-toggle" type="button" disabled>Riproduci</button>
+  </div>
+  <footer>Un progetto indipendente. Contenuti e media di <a href="https://www.radioradicale.it" target="_blank" rel="noopener noreferrer">Radio Radicale</a>. <a href="/docs">Documentazione API</a>.</footer>
+</body>
+</html>
