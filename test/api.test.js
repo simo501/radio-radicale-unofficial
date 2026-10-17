@@ -113,7 +113,15 @@ test('HTTP handler returns static UI, docs, method errors and valid headers', as
   assert.equal(page.status, 200);
   assert.match(page.body, /id="search-form"/);
   assert.equal((await request('/ui/app.js')).status, 200);
-  assert.equal((await request('/docs')).status, 200);
+  for (const path of ['/docs', '/api-docs']) {
+    const docs = await request(path);
+    assert.equal(docs.status, 200);
+    assert.match(docs.body, /id="theme-toggle"/);
+    assert.match(docs.body, /src="\/ui\/theme.js"/);
+  }
+  const theme = await request('/ui/theme.js');
+  assert.equal(theme.status, 200);
+  assert.match(theme.body, /rr-theme/);
 
   const head = await request('/api/live', 'HEAD');
   assert.equal(head.status, 200);

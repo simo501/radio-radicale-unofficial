@@ -54,6 +54,7 @@ const recording = {
 async function setup({ hls = true, data = recording, searchData = null, search = '?id=586796' } = {}) {
   const ids = new Map();
   const body = new Element('body');
+  const root = new Element('html'); root.append(body);
   const html = readFileSync(new URL('../src/ui/index.html', import.meta.url), 'utf8');
   for (const match of html.matchAll(/<([a-z][a-z0-9]*)\b[^>]*\bid="([^"]+)"/gi)) {
     const element = new Element(match[1]); element.id = match[2]; ids.set(element.id, element); body.append(element);
@@ -61,7 +62,7 @@ async function setup({ hls = true, data = recording, searchData = null, search =
   const element = id => { assert.ok(ids.has(id), `Missing element ${id}`); return ids.get(id); };
   const shell = new Element(); shell.className = 'media-shell'; body.append(shell);
   shell.append(element('media-video'), element('media-audio'));
-  const document = { body, getElementById: element, createElement: tag => new Element(tag), querySelectorAll: selector => body.querySelectorAll(selector) };
+  const document = Object.assign(new EventTarget(), { body, documentElement: root, readyState: 'complete', getElementById: element, createElement: tag => new Element(tag), querySelectorAll: selector => body.querySelectorAll(selector) });
 
   class Plyr {
     static instances = [];
@@ -103,11 +104,12 @@ async function setup({ hls = true, data = recording, searchData = null, search =
       return { ok: true, json: async () => url.includes('/api/scheda/') ? data : searchData ? searchData(url) : { query: 'giustizia', type: 'general', results: [{ id: data.id, title: data.title }], count: 1, pagination: {}, related: [] } };
     }
   };
+  vm.runInNewContext(readFileSync(new URL('../src/ui/theme.js', import.meta.url), 'utf8'), context);
   vm.runInNewContext(readFileSync(new URL('../src/ui/speaker-timeline.js', import.meta.url), 'utf8'), context);
   vm.runInNewContext(readFileSync(new URL('../src/ui/app.js', import.meta.url), 'utf8'), context);
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(element('player-status').classList.contains('error'), false, element('player-status').textContent);
-  return { element, Plyr, Hls, requests, addresses, audio: element('media-audio'), video: element('media-video'), clickSpeaker: index => element('speakers').children[index].emit('click') };
+  return { element, root, Plyr, Hls, requests, addresses, audio: element('media-audio'), video: element('media-video'), clickSpeaker: index => element('speakers').children[index].emit('click') };
 }
 
 test('player labels tracks and interventions and follows playback after reopening a search result', async () => {
@@ -427,4 +429,24 @@ test('unknown total page counts never impose a ten-page limit or a false last-pa
   assert.equal(requests.at(-1), '/api/search?q=giustizia&page=10');
   assert.equal(element('page-label').textContent, 'Pagina 11');
   assert.equal(element('page-number').max, undefined);
+});
+
+test('theme switching remains available in search and playback without restarting the stream', async () => {
+  const { element, root, audio, Hls, requests } = await setup();
+  const stream = Hls.instances.at(-1); stream.emit('manifest'); stream.metadata();
+  await audio.play(); audio.currentTime = 340;
+  const calls = requests.length;
+  element('theme-toggle').emit('click');
+  assert.equal(root.dataset.theme, 'dark');
+  assert.equal(element('theme-toggle')['aria-checked'], 'true');
+  element('tab-search').emit('click');
+  element('theme-toggle').emit('click');
+  assert.equal(root.dataset.theme, 'light');
+  element('tab-player').emit('click');
+  assert.equal(root.dataset.theme, 'light');
+  assert.equal(Hls.instances.at(-1), stream);
+  assert.equal(audio.currentTime, 340);
+  assert.equal(audio.paused, false);
+  assert.equal(audio.playCount, 1);
+  assert.equal(requests.length, calls);
 });

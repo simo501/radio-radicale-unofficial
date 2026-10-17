@@ -3,8 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#f3f3f3">
+  <meta id="theme-color" name="theme-color" content="#ffffff">
   <title>Archivio · Radio Radicale</title>
+  <script src="/ui/theme.js"></script>
   <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css">
   <link rel="stylesheet" href="/ui/styles.css">
   <script defer src="https://cdn.jsdelivr.net/npm/hls.js@1.5.8/dist/hls.min.js"></script>
@@ -17,7 +18,10 @@
   <header class="topbar">
     <a class="brand" href="/" aria-label="Radio Radicale, pagina iniziale">radio radicale</a>
     <span class="brand-context">/ archivio pubblico</span>
-    <a class="docs-link" href="/docs">[api]</a>
+    <div class="header-actions">
+      <a class="docs-link" href="/docs">[api]</a>
+      <button id="theme-toggle" class="theme-toggle" type="button" role="switch" aria-checked="false" aria-label="Tema scuro" title="Passa al tema scuro"><span id="theme-icon" aria-hidden="true">☾</span><span id="theme-label" aria-hidden="true">scuro</span></button>
+    </div>
   </header>
 
   <div class="mobile-tabs" role="tablist" aria-label="Sezioni">
@@ -106,5 +110,6 @@
     <button id="mini-toggle" class="mini-toggle" type="button" disabled>Riproduci</button>
   </div>
   <footer>Un progetto indipendente. Contenuti e media di <a href="https://www.radioradicale.it" target="_blank" rel="noopener noreferrer">Radio Radicale</a>. <a href="/docs">Documentazione API</a>.</footer>
+  <script>window.ArchiveTheme?.init();</script>
 </body>
 </html>
