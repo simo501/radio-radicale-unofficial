@@ -28,6 +28,56 @@
     return params;
   }
 
+  function shareUrl() {
+    if (!state.playback) return null;
+    const url = new URL('/', location.href);
+    if (state.live) url.searchParams.set('live', '1');
+    else {
+      if (!state.recording?.id) return null;
+      url.searchParams.set('id', state.recording.id);
+      url.searchParams.set('track', String(state.track + 1));
+      if ($('share-position').checked) {
+        const seconds = state.playback.pendingSeek ?? media.currentTime;
+        if (Number.isFinite(seconds) && seconds >= 0) url.searchParams.set('t', String(Math.floor(seconds)));
+      }
+    }
+    return url.href;
+  }
+
+  function showShareUrl(url, playback) {
+    if (playback !== state.playback) return;
+    $('share-url').value = url;
+    $('share-url').hidden = false;
+    $('share-url-label').hidden = false;
+    setStatus('share-status', 'Copia questo link per condividerlo.');
+    $('share-url').focus?.(); $('share-url').select?.();
+  }
+
+  async function copyRecordingLink(url = shareUrl(), playback = state.playback) {
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      if (playback !== state.playback) return;
+      $('share-url').hidden = true; $('share-url-label').hidden = true;
+      setStatus('share-status', 'Link copiato.');
+    } catch { showShareUrl(url, playback); }
+  }
+
+  async function shareRecording() {
+    const url = shareUrl();
+    if (!url) return;
+    const playback = state.playback;
+    const data = { title: state.live ? 'Radio Radicale in diretta' : state.recording.title, url };
+    try {
+      if (typeof navigator.share === 'function' && (!navigator.canShare || navigator.canShare(data))) {
+        await navigator.share(data);
+        if (playback === state.playback) setStatus('share-status', 'Link condiviso.');
+        return;
+      }
+    } catch (error) { if (error.name === 'AbortError') return; }
+    await copyRecordingLink(url, playback);
+  }
+
   async function json(url) {
     const response = await fetch(url, { headers: { Accept: 'application/json' } });
     let data;
@@ -106,6 +156,9 @@
     $('playback-tools').hidden = true;
     $('mini-toggle').disabled = true;
     $('mini-toggle').textContent = 'Riproduci';
+    $('share-controls').hidden = true;
+    $('share-status').textContent = '';
+    $('share-url').hidden = true; $('share-url-label').hidden = true;
     media.closest('.plyr')?.querySelector('.speaker-marker-layer')?.remove();
     if (state.hls) { state.hls.destroy(); state.hls = null; }
     state.timelineDuration = null;
@@ -244,7 +297,7 @@
     if (!playback || playback.element !== media) return;
     if (playback.pendingSeek !== null) {
       if (media.readyState < 1) return;
-      try { media.currentTime = playback.pendingSeek; }
+      try { media.currentTime = Math.min(playback.pendingSeek, mediaDuration() ?? playback.pendingSeek); }
       catch { return; }
       playback.pendingSeek = null;
       updateSpeaker();
@@ -323,6 +376,9 @@
     $('playback-speed').value = String(state.rate);
     $('playback-tools').hidden = state.live;
     $('mini-toggle').disabled = false;
+    $('share-controls').hidden = false;
+    $('share-position').disabled = state.live;
+    if (state.live) $('share-position').checked = false;
     renderTimeline();
     $('copy-media').hidden = false; $('copy-media').dataset.url = source;
     $('media-link').hidden = false; $('media-link').href = source;
@@ -401,11 +457,11 @@
     const track = state.recording?.tracks?.[index]; if (!track) return;
     state.track = index; $('track-select').value = String(index);
     $('player-kind').textContent = `${trackLabel(index)} di ${state.recording.tracks.length}`;
-    setMedia(track.m3u8, track.subtitles, track.audio, state.recording.poster, autoplay || seek !== null, seek);
+    setMedia(track.m3u8, track.subtitles, track.audio, state.recording.poster, autoplay, seek);
     updateSpeaker();
   }
 
-  function renderRecording(recording, autoplay = false) {
+  function renderRecording(recording, autoplay = false, start = null) {
     state.recording = recording; state.live = false;
     $('empty-player').hidden = true; $('loaded-player').hidden = false; $('detail-content').hidden = false;
     $('player-kind').textContent = 'ARCHIVIO';
@@ -423,20 +479,26 @@
     $('source-link').hidden = !source; if (source) $('source-link').href = source;
     $('json-link').hidden = !recording.id; $('json-link').href = `/api/scheda/${encodeURIComponent(recording.id)}`;
     renderSpeakers(recording);
-    if (recording.tracks?.length) selectTrack(0, null, autoplay);
+    if (recording.tracks?.length) {
+      const index = Number.isInteger(start?.track) && recording.tracks[start.track] ? start.track : 0;
+      const time = Number.isFinite(start?.time) && start.time >= 0 ? start.time : null;
+      selectTrack(index, time, autoplay);
+    }
     else { disposeMedia(); $('copy-media').hidden = true; $('media-link').hidden = true; updateSpeaker(); setStatus('player-status', 'Nessuna traccia disponibile per questa scheda.'); }
     $('mini-player').hidden = false; $('mini-title').textContent = recording.title || 'Registrazione'; $('mini-state').textContent = 'Tocca per aprire';
     showTab('player');
   }
 
-  async function openRecording(input, autoplay = false) {
+  async function openRecording(input, autoplay = false, start = null) {
     const value = String(input || '').trim(); if (!value) return;
     const token = ++state.detailToken; setStatus('player-status', 'Caricamento della scheda…'); showTab('player');
     const url = /^\d+$/.test(value) ? `/api/scheda/${value}` : `/api/scheda?url=${encodeURIComponent(value)}`;
     try {
       const data = await json(url); if (token !== state.detailToken) return;
-      renderRecording(data, autoplay);
+      renderRecording(data, autoplay, start);
       const params = searchParameters(); params.set('id', data.id);
+      if (state.track > 0) params.set('track', String(state.track + 1));
+      if (Number.isFinite(start?.time) && start.time >= 0) params.set('t', String(start.time));
       history.replaceState(null, '', `/?${params}`);
     } catch (error) { if (token === state.detailToken) setStatus('player-status', error.message, true); }
   }
@@ -457,6 +519,8 @@
   $('live-button').addEventListener('click', () => openLive(true));
   $('track-select').addEventListener('change', event => selectTrack(Number(event.target.value), null, true));
   $('speaker-filter').addEventListener('input', filterSpeakers);
+  $('share-recording').addEventListener('click', shareRecording);
+  $('copy-recording').addEventListener('click', () => copyRecordingLink());
   $('seek-form').addEventListener('submit', jumpToTime);
   for (const id of ['seek-minutes', 'seek-seconds']) $(id).addEventListener('input', () => {
     $('seek-error').textContent = '';
@@ -522,5 +586,12 @@
   else if (params.has('q')) search(params.get('q') || 'giustizia', initialPage, 'general', false);
   else search('giustizia', 0, 'general', false);
   if (params.get('live') === '1') openLive();
-  else if (params.has('id') || params.has('url')) openRecording(params.get('id') || params.get('url'));
+  else if (params.has('id') || params.has('url')) {
+    const track = Number(params.get('track'));
+    const time = params.get('t') === null || params.get('t').trim() === '' ? null : Number(params.get('t'));
+    openRecording(params.get('id') || params.get('url'), false, {
+      track: Number.isSafeInteger(track) && track > 0 ? track - 1 : 0,
+      time: Number.isFinite(time) && time >= 0 ? time : null
+    });
+  }
 })();

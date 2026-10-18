@@ -11,8 +11,10 @@ export function searchUrl(query, page = 0, type = 'general') {
   if (!String(query || '').trim()) throw new HttpError(400, 'Search query is required.');
   if (String(query).length > 200) throw new HttpError(400, 'Search query is too long.');
   const url = new URL('/cerca', config.upstream);
-  url.searchParams.set('raggruppamenti_radio', '6');
   url.searchParams.set('search_api_views_fulltext', String(query).trim());
+  url.searchParams.set('raggruppamenti_radio', 'All');
+  url.searchParams.set('field_data_1[date]', '');
+  url.searchParams.set('field_data_2[date]', '');
   if (page) url.searchParams.set('page', String(page));
   return url.href;
 }

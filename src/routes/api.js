@@ -46,7 +46,7 @@ export async function routeApi(req, res, url) {
     const type = subject ? 'soggetti' : url.searchParams.get('type') || 'general';
     const page = nonnegative(url.searchParams.get('page'), 'page');
     if (!query) throw new HttpError(400, 'Search query is required.');
-    const key = `search:${type}:${query.trim()}:${page}`;
+    const key = `search:${type === 'general' ? 'all' : type}:${query.trim()}:${page}`;
     const { value, state } = await cached(key, () => getSearch(query, page, type));
     send(req, res, 200, value, undefined, { 'X-Cache': state });
     return true;

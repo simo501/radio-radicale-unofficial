@@ -26,7 +26,7 @@ export function routeDocs(req, res, pathname) {
     <h1>Radio Radicale archive API</h1>
     <p>Unofficial, read-only API for public pages. <a href="/">Open the player</a>.</p>
     <ul>
-      <li><code>GET /api/search?q=giustizia&amp;page=0</code> · archive search</li>
+      <li><code>GET /api/search?q=giustizia&amp;page=0</code> · full archive search, all categories and no date restriction</li>
       <li><code>GET /api/soggetti/86/marco-pannella?page=0</code> · subject listing</li>
       <li><code>GET /api/scheda/163473</code> · recording metadata and tracks</li>
       <li><code>GET /api/m3u8/163473?track=0&amp;redirect=false</code> · HLS source JSON (redirect by default)</li>

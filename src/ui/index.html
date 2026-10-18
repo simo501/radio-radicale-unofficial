@@ -34,7 +34,7 @@
       <div class="search-header">
         <p class="eyebrow">voci, persone, storia</p>
         <h1 id="search-heading">cerca nell’archivio</h1>
-        <p class="intro">Registrazioni, dibattiti e udienze di Radio Radicale.</p>
+        <p class="intro">Registrazioni, interviste, dibattiti e udienze da tutto l’archivio di Radio Radicale.</p>
       </div>
       <form id="search-form" class="search-form" role="search">
         <label for="search-input">Parole, persone o eventi</label>
@@ -85,6 +85,11 @@
           </div>
           <div id="track-container" class="track-container" hidden><label for="track-select">Traccia</label><select id="track-select"></select></div>
           <div id="speaker-now" class="speaker-now" aria-live="polite" hidden><span id="speaker-now-label">INTERVENTO IN CORSO</span><strong id="speaker-now-name"></strong><small id="speaker-now-meta"></small></div>
+          <div id="share-controls" class="share-controls" hidden>
+            <div class="share-actions"><button id="share-recording" type="button">condividi</button><button id="copy-recording" type="button">copia link</button><label class="share-position" for="share-position"><input id="share-position" type="checkbox">dal punto attuale</label></div>
+            <p id="share-status" class="status" role="status"></p>
+            <label id="share-url-label" for="share-url" hidden>Link da copiare</label><input id="share-url" class="share-url" type="url" readonly spellcheck="false" aria-describedby="share-status" hidden>
+          </div>
           <div class="player-actions"><button id="copy-media" type="button" hidden>copia link media</button><a id="media-link" href="#" target="_blank" rel="noopener noreferrer" hidden>apri media ↗</a><a id="source-link" href="#" target="_blank" rel="noopener noreferrer" hidden>scheda originale ↗</a><a id="json-link" href="#" target="_blank" rel="noopener noreferrer" hidden>json ↗</a></div>
         </div>
       </div>

@@ -51,7 +51,7 @@ const recording = {
   topics: [], canonicalUrl: 'https://www.radioradicale.it/scheda/586796'
 };
 
-async function setup({ hls = true, data = recording, searchData = null, search = '?id=586796' } = {}) {
+async function setup({ hls = true, data = recording, searchData = null, search = '?id=586796', navigator: browserNavigator = {}, baseUrl = 'http://localhost:3000' } = {}) {
   const ids = new Map();
   const body = new Element('body');
   const root = new Element('html'); root.append(body);
@@ -97,8 +97,8 @@ async function setup({ hls = true, data = recording, searchData = null, search =
   const addresses = [];
   const context = {
     window: { Plyr, Hls }, document, URL, URLSearchParams, setTimeout,
-    location: { href: `http://localhost:3000/${search}`, search },
-    history: { replaceState(_state, _title, address) { addresses.push(address); } }, navigator: {},
+    location: { href: `${baseUrl}/${search}`, search },
+    history: { replaceState(_state, _title, address) { addresses.push(address); } }, navigator: browserNavigator,
     fetch: async url => {
       requests.push(url);
       return { ok: true, json: async () => url.includes('/api/scheda/') ? data : searchData ? searchData(url) : { query: 'giustizia', type: 'general', results: [{ id: data.id, title: data.title }], count: 1, pagination: {}, related: [] } };
@@ -449,4 +449,109 @@ test('theme switching remains available in search and playback without restartin
   assert.equal(audio.paused, false);
   assert.equal(audio.playCount, 1);
   assert.equal(requests.length, calls);
+});
+
+test('native share uses the selected audio and optionally includes the current position', async () => {
+  const shared = [];
+  const { element, audio, Hls, clickSpeaker } = await setup({ baseUrl: 'https://archive.example', navigator: { share: async data => { shared.push(data); } } });
+  clickSpeaker(2);
+  const stream = Hls.instances.at(-1); stream.emit('manifest'); stream.metadata();
+  element('share-recording').emit('click');
+  await new Promise(resolve => setImmediate(resolve));
+  const first = new URL(shared[0].url);
+  assert.equal(first.origin, 'https://archive.example');
+  assert.equal(first.searchParams.get('id'), recording.id);
+  assert.equal(first.searchParams.get('track'), '2');
+  assert.equal(first.searchParams.has('q'), false);
+  assert.equal(first.searchParams.has('t'), false);
+  assert.equal(shared[0].title, recording.title);
+  audio.currentTime = 125.9;
+  element('share-position').checked = true; element('share-recording').emit('click');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(new URL(shared[1].url).searchParams.get('t'), '125');
+  assert.equal(audio.currentTime, 125.9);
+  assert.equal(audio.paused, false);
+  assert.equal(Hls.instances.at(-1), stream);
+});
+
+test('copy link and desktop share fallback copy a playable recording URL', async () => {
+  const copied = [];
+  const { element, audio } = await setup({ navigator: { clipboard: { writeText: async value => { copied.push(value); } } } });
+  element('copy-recording').emit('click');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(new URL(copied[0]).searchParams.get('track'), '1');
+  assert.equal(new URL(copied[0]).searchParams.get('id'), recording.id);
+  assert.equal(element('share-status').textContent, 'Link copiato.');
+  audio.currentTime = 91; element('share-position').checked = true;
+  element('share-recording').emit('click');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(new URL(copied[1]).searchParams.get('t'), '91');
+  assert.equal(audio.paused, true);
+});
+
+test('shared track and timestamp links restore the correct audio paused at the selected point', async () => {
+  const { audio, element, Hls, addresses } = await setup({ search: '?id=586796&track=2&t=95' });
+  const stream = Hls.instances.at(-1);
+  assert.equal(stream.source, recording.tracks[1].m3u8);
+  assert.equal(stream.options.startPosition, 95);
+  assert.equal(element('track-select').value, '1');
+  stream.emit('manifest'); stream.metadata();
+  assert.equal(audio.currentTime, 95);
+  assert.equal(audio.paused, true);
+  assert.equal(audio.playCount, 0);
+  assert.equal(element('speaker-now-name').textContent, 'Maria Rossi');
+  const address = new URL(addresses.at(-1), 'http://localhost:3000');
+  assert.equal(address.searchParams.get('track'), '2');
+  assert.equal(address.searchParams.get('t'), '95');
+});
+
+test('shared timestamps work with native HLS and clamp to the track duration', async () => {
+  const { audio } = await setup({ hls: false, search: '?id=586796&track=2&t=9999' });
+  assert.equal(audio.src, recording.tracks[1].m3u8);
+  audio.readyState = 1; audio.duration = 300; audio.emit('loadedmetadata');
+  assert.equal(audio.currentTime, 300);
+  assert.equal(audio.playCount, 0);
+});
+
+test('invalid shared playback parameters safely open the first audio track', async () => {
+  const { audio, element, Hls } = await setup({ search: '?id=586796&track=999&t=NaN' });
+  const stream = Hls.instances.at(-1);
+  assert.equal(stream.source, recording.tracks[0].m3u8);
+  stream.emit('manifest'); stream.metadata();
+  assert.equal(element('track-select').value, '0');
+  assert.equal(audio.currentTime, 0);
+  assert.equal(audio.paused, true);
+});
+
+test('blocked clipboard exposes a selectable link and canceling native share does not copy it', async () => {
+  const blocked = await setup();
+  blocked.element('copy-recording').emit('click');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(blocked.element('share-url').hidden, false);
+  assert.equal(blocked.element('share-url-label').hidden, false);
+  assert.equal(new URL(blocked.element('share-url').value).searchParams.get('id'), recording.id);
+  let copies = 0;
+  const canceled = await setup({ navigator: {
+    share: async () => { const error = new Error('Canceled'); error.name = 'AbortError'; throw error; },
+    clipboard: { writeText: async () => { copies++; } }
+  } });
+  canceled.element('share-recording').emit('click');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(copies, 0);
+  assert.equal(canceled.element('share-url').hidden, true);
+  assert.equal(canceled.element('share-status').textContent, '');
+});
+
+test('live sharing opens the live stream and does not include an archive timestamp', async () => {
+  const copied = [];
+  const { element } = await setup({ navigator: { clipboard: { writeText: async value => { copied.push(value); } } } });
+  element('live-button').emit('click');
+  element('copy-recording').emit('click');
+  await new Promise(resolve => setImmediate(resolve));
+  const url = new URL(copied[0]);
+  assert.equal(url.searchParams.get('live'), '1');
+  assert.equal(url.searchParams.has('id'), false);
+  assert.equal(url.searchParams.has('track'), false);
+  assert.equal(url.searchParams.has('t'), false);
+  assert.equal(element('share-position').disabled, true);
 });

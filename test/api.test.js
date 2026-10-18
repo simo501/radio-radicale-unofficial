@@ -9,6 +9,19 @@ import { gunzipSync } from 'node:zlib';
 const searchFixture = `<ul><li class="clearfix"><a href="/scheda/12345/assemblea"><h3>Assemblea &amp; dibattito</h3></a><time datetime="2020-04-18">18 aprile 2020</time><span class="durata">1:20:00</span><img src="/files/thumb.jpg"></li><li class="clearfix"><a href="/scheda/12345/again">Duplicate</a></li></ul><nav class="pager"><a href="?page=1">2</a></nav><a href="/soggetti/86/marco-pannella">Marco Pannella</a>`;
 const recordingFixture = `<html><head><meta property="og:image" content="/images/123.jpg"><link rel="canonical" href="https://www.radioradicale.it/scheda/12345/assemblea"></head><body><h1>Assemblea &amp; dibattito</h1><div class="summary">Una discussione &lt;pubblica&gt;.</div><script>jQuery.extend(Drupal.settings, {"RRscheda":{"playlist":[{"title":"Prima parte","audio":true,"sources":[{"file":"https://media.example.org/123/playlist.m3u8"}],"subtitles":[{"src":"https://media.example.org/sub.vtt","srclang":"it"}]}],"interventions":[{"id":1,"name":"Ada Rossi","offset":42,"fileIndex":0}]}});</script></body></html>`;
 
+test('full archive search matches the unrestricted upstream query on every page', () => {
+  for (const page of [0, 1, 20]) {
+    const url = new URL(searchUrl('mokbel', page));
+    assert.equal(url.pathname, '/cerca');
+    assert.equal(url.searchParams.get('search_api_views_fulltext'), 'mokbel');
+    assert.equal(url.searchParams.get('raggruppamenti_radio'), 'All');
+    assert.equal(url.searchParams.get('field_data_1[date]'), '');
+    assert.equal(url.searchParams.get('field_data_2[date]'), '');
+    assert.equal(Number(url.searchParams.get('page') || 0), page);
+  }
+  assert.equal(searchUrl('86/marco-pannella', 2, 'soggetti'), 'https://www.radioradicale.it/soggetti/86/marco-pannella?page=2');
+});
+
 test('search parser keeps result shape, pagination and related terms', () => {
   const data = parseSearch(searchFixture, { query: 'assemblea', page: 0, searchUrl: searchUrl('assemblea') });
   assert.equal(data.count, 1);
@@ -179,6 +192,9 @@ test('search API fetches and caches result pages independently', async () => {
   const pages = [];
   globalThis.fetch = async input => {
     const url = new URL(input);
+    assert.equal(url.searchParams.get('raggruppamenti_radio'), 'All');
+    assert.equal(url.searchParams.get('field_data_1[date]'), '');
+    assert.equal(url.searchParams.get('field_data_2[date]'), '');
     const page = Number(url.searchParams.get('page') || 0);
     pages.push(page);
     const row = `<li class="clearfix"><a href="/scheda/${40000 + page}/titolo"><h3>Pagina ${page + 1}</h3></a></li>`;
